@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>70-Metre Olympic Archery Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="archery2.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7" defer></script>
+</head>
+<body>
+<svg class="field-rings" viewBox="0 0 200 200" aria-hidden="true">
+  <g fill="none" stroke-width="0.6">
+    <circle cx="100" cy="100" r="95" stroke="#FEE12A" opacity=".10"/>
+    <circle cx="100" cy="100" r="76" stroke="#E60E2A" opacity=".09"/>
+    <circle cx="100" cy="100" r="57" stroke="#1f86df" opacity=".10"/>
+    <circle cx="100" cy="100" r="38" stroke="#cfd3cb" opacity=".07"/>
+    <circle cx="100" cy="100" r="19" stroke="#FEE12A" opacity=".14"/>
+    <line x1="0" y1="100" x2="200" y2="100" stroke="#cfd3cb" opacity=".05"/>
+    <line x1="100" y1="0" x2="100" y2="200" stroke="#cfd3cb" opacity=".05"/>
+  </g>
+</svg>
+<div class="grain"></div>
+
+<header>
+  <h1 class="reveal d1"><span class="g">70</span>-Metre <span class="thin">Olympic</span> Archery Visualizer</h1>
+  <p class="lede reveal d2">Shoot a full 72-arrow match or run twenty at once. The simulator starts from <b>measured 70 m hit coordinates</b>, then scales that real impact pattern toward Olympic-style 72-arrow score levels: pro, elite, intermediate, and beginner.</p>
+  <div class="sources reveal d2" aria-label="Data and research sources">
+    <div class="label">Sources</div>
+    <ul>
+      <li>Lin J.-J. et al., <i>Hit distribution patterns in recurve archery</i> - <a href="https://www.researchgate.net/publication/288300649" target="_blank" rel="noopener noreferrer">ResearchGate</a></li>
+      <li><code>qcr::archery1</code> R dataset - <a href="https://rdrr.io/cran/qcr/man/archery1.html" target="_blank" rel="noopener noreferrer">rdrr.io</a></li>
+    </ul>
+  </div>
+
+  <div class="fields reveal d3">
+    <div class="field"><span class="fk">Distance</span><span class="fv">70 <span class="u">m</span></span></div>
+    <div class="field"><span class="fk">Arrows</span><span class="fv">72</span></div>
+    <div class="field"><span class="fk">Ends</span><span class="fv">12 <span class="u">× 6</span></span></div>
+    <div class="field"><span class="fk">Max score</span><span class="fv">720</span></div>
+    <div class="field"><span class="fk">Inner ten</span><span class="fv">X <span class="u">(≤ 6.1 cm)</span></span></div>
+  </div>
+
+  <nav class="tabs reveal d4" role="tablist" aria-label="View mode">
+    <button class="tab on" id="tabSingle" role="tab" aria-selected="true" aria-controls="singleView">Single match</button>
+    <button class="tab" id="tabMulti" role="tab" aria-selected="false" aria-controls="multiView">20-match simulator</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <section id="singleView" class="view" role="tabpanel" aria-labelledby="tabSingle">
+    <div class="single-grid">
+      <div class="col">
+        <div class="panel target-panel reveal d1">
+          <div class="phead"><span class="tick"></span><h2>Target face</h2><span class="meta" id="singleModeLabel"></span></div>
+          <div class="plate"><svg id="mainTarget" viewBox="0 0 560 560" role="img" aria-label="Target face showing arrow impacts"></svg></div>
+          <div class="cap">One point per arrow. ✕ marks the group centre; the ellipse is the revealed group shape. Hover an arrow for its value and coordinates.</div>
+        </div>
+
+        <div class="panel reveal d3">
+          <div class="phead"><span class="tick"></span><h2>Scorecard</h2><span class="meta">12 ends · live</span></div>
+          <div class="scorecard" id="scorecard"></div>
+          <div class="cap">The card fills as the round plays. Cells are tinted by scoring zone (gold, red, blue, black, white), exactly as you'd mark it at a shoot.</div>
+        </div>
+      </div>
+
+
+      
+      <div class="col">
+        <div class="panel reveal d4">
+          <div class="phead"><span class="tick"></span><h2>Playback</h2></div>
+          <div class="play">
+            <button class="btn" id="singlePlayBtn">▶ Play round</button>
+            <input type="range" id="singleScrub" min="0" max="72" step="1" value="72">
+            <span id="singleShotLbl" class="shotlbl"></span>
+          </div>
+        </div>
+        <div class="panel reveal d2">
+          <div class="phead"><span class="tick blue"></span><h2>Match source</h2></div>
+          <button class="btn" id="realRoundBtn">Use measured real round</button>
+          <div class="presets" id="singlePresets"></div>
+          <div class="small-row">
+            <button class="btn" id="newSingleBtn">New match</button>
+            <button class="btn" id="singleResetBtn">Reset</button>
+          </div>
+          <div class="note">Presets use the measured hit pattern as the base shape. The spread, wobble, fatigue and bias are scaled to match realistic score bands, so better levels tighten the same real pattern instead of creating a new fake distribution.</div>
+        </div>
+
+        <div class="panel reveal d3">
+          <div class="phead"><span class="tick"></span><h2>Calibration</h2></div>
+          <div class="ctrl"><label for="spread">Spread scale <b id="vSpread"></b></label><input type="range" id="spread" min="0.25" max="2.20" step="0.05"></div>
+          <div class="ctrl"><label for="bx">Horizontal bias <b id="vBx"></b></label><input type="range" id="bx" min="-20" max="20" step="0.5"></div>
+          <div class="ctrl"><label for="by">Vertical bias <b id="vBy"></b></label><input type="range" id="by" min="-20" max="20" step="0.5"></div>
+          <div class="ctrl"><label for="fat">Fatigue drift <b id="vFat"></b></label><input type="range" id="fat" min="0" max="8" step="0.25"></div>
+          <div class="ctrl"><label for="blend">Real-pattern blend <b id="vBlend"></b></label><input type="range" id="blend" min="0" max="1" step="0.05"></div>
+          <div class="cap">Blend 0 is clean Gaussian noise. Blend 1 follows the measured residual shape almost fully.</div>
+        </div>
+
+
+        <div class="panel reveal d5">
+          <div class="phead"><span class="tick"></span><h2>Live result</h2></div>
+          <div class="stats">
+            <div class="stat hero"><div class="v" id="sScore">—</div><div class="k">Score</div></div>
+            <div class="stat"><div class="v" id="sLast">—</div><div class="k">Last arrow</div></div>
+            <div class="stat"><div class="v" id="sMeanR">—</div><div class="k">Mean r · cm</div></div>
+          </div>
+        </div>
+
+        <div class="panel reveal d6">
+          <div class="phead"><span class="tick red"></span><h2>End timeline</h2></div>
+          <svg id="timeline" viewBox="0 0 360 180" role="img" aria-label="Score per end across the round"></svg>
+          <div class="cap">One point per end of six arrows. The faint line shows the full round ahead.</div>
+        </div>
+
+        <div class="panel reveal d6">
+          <div class="phead"><span class="tick"></span><h2>Score per arrow</h2></div>
+          <svg id="hist" viewBox="0 0 360 160" role="img" aria-label="Count of arrows by score value"></svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="multiView" class="view hidden" role="tabpanel" aria-labelledby="tabMulti">
+    <div class="multi-head">
+      <div class="panel">
+        <div class="phead"><span class="tick"></span><h2>Twenty simulated matches</h2></div>
+        <div class="stats">
+          <div class="stat hero"><div class="v" id="mAvg">—</div><div class="k">Average</div></div>
+          <div class="stat"><div class="v" id="mBest">—</div><div class="k">Best</div></div>
+          <div class="stat"><div class="v" id="mWorst">—</div><div class="k">Worst</div></div>
+        </div>
+        <div class="cap">Twenty full match faces, every one playable arrow by arrow.</div>
+      </div>
+      <div class="panel multi-controls">
+        <div class="phead"><span class="tick"></span><h2>Controls</h2></div>
+        <div class="presets" id="multiPresets"></div>
+        <div class="small-row">
+          <button class="btn" id="newMultiBtn">Generate 20</button>
+          <button class="btn" id="multiResetBtn">Reset</button>
+        </div>
+        <div class="play">
+          <button class="btn" id="multiPlayBtn">▶ Play 20 matches</button>
+          <input type="range" id="multiScrub" min="0" max="72" step="1" value="72">
+          <span id="multiShotLbl" class="shotlbl"></span>
+        </div>
+      </div>
+    </div>
+    <div class="panel multi-score-panel">
+      <div class="phead"><span class="tick blue"></span><h2>Monte Carlo score distribution</h2><span class="meta" id="mHistMeta">1,000 simulated rounds</span></div>
+      <svg id="multiScoreHist" viewBox="0 0 900 250" role="img" aria-label="Monte Carlo distribution of 1,000 simulated match scores"></svg>
+      <div class="cap">The bars show a 1,000-round Monte Carlo distribution for the selected archer level. The twenty visible matches are overlaid as short ticks, so you can see whether this batch is typical or unusually high/low.</div>
+    </div>
+    <div class="targets-grid" id="targetsGrid"></div>
+  </section>
+</main>
+
+<div class="tip" id="tip"></div>
+
+<script src="archery2.js" defer></script>
+</body>
+</html>
